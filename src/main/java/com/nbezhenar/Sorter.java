@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 public class Sorter {
-	public static Map<String, Integer> compareByRating(
+	public static Map<String, Integer> compareByViewCount(
 			Map<String, Integer> linksMap) {
 		List<Map.Entry<String, Integer>> entries = new LinkedList<Map.Entry<String, Integer>>(
 				linksMap.entrySet());

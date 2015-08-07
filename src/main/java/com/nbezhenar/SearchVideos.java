@@ -27,23 +27,10 @@ public class SearchVideos {
 	private static String PROPERTIES_FILENAME = "youtube.properties";
 	private static final HttpTransport HTTP_TRANSPORT = new NetHttpTransport();
 	private static final JsonFactory JSON_FACTORY = new JacksonFactory();
-	private static final long NUMBER_OF_VIDEOS_RETURNED = 6;
+	private static final long NUMBER_OF_VIDEOS_RETURNED = 10;
 	private static YouTube youtube;
 
 	public static void main(String[] args) {
-
-		Properties properties = new Properties();
-		try {
-			InputStream in = Search.class.getResourceAsStream("/"
-					+ PROPERTIES_FILENAME);
-			properties.load(in);
-
-		} catch (IOException e) {
-			System.err.println("There was an error reading "
-					+ PROPERTIES_FILENAME + ": " + e.getCause() + " : "
-					+ e.getMessage());
-			System.exit(1);
-		}
 
 		try {
 			youtube = new YouTube.Builder(HTTP_TRANSPORT, JSON_FACTORY,
@@ -53,50 +40,8 @@ public class SearchVideos {
 						}
 					}).setApplicationName("youtube-cmdline-search").build();
 
-			List<String> videoIds = getIdVideo("NZi_M-TfioM", properties);
-
-			List<Integer> viewCount = getViewCount(videoIds, properties);
-
-			Map<String, Integer> relatedLinksMap = getMap(videoIds, viewCount);
-
-			List<String> intermediateStrL = new ArrayList<String>();
-
-			int nestingLevel = 2;
-			int count = 0;
-			while (count != nestingLevel) {
-				Map<String, Integer> test = new HashMap<String, Integer>();
-				test.putAll(relatedLinksMap);
-
-				for (String key : test.keySet()) {
-
-					getIdVideo(key, properties);
-					intermediateStrL.addAll(getIdVideo(key, properties));
-
-				}
-				List<Integer> intermediateIntL = getViewCount(intermediateStrL,
-						properties);
-
-				Map<String, Integer> relatedLinksMapTest = getMap(
-						intermediateStrL, intermediateIntL);
-				relatedLinksMap.putAll(relatedLinksMapTest);
-
-				test.clear();
-				intermediateStrL.clear();
-				intermediateIntL.clear();
-				relatedLinksMapTest.clear();
-				count++;
-			}
-
-			System.out.println("Total quantity of links "
-					+ relatedLinksMap.size());
-
-			System.out.println("TOP " + NUMBER_OF_VIDEOS_RETURNED + " values");
-
-			Map<String, Integer> sortedAndTrimmedMap = Sorter.getTopNValues(
-					Sorter.compareByRating(relatedLinksMap),
-					(int) NUMBER_OF_VIDEOS_RETURNED);
-			for (Map.Entry<String, Integer> entry : sortedAndTrimmedMap
-					.entrySet()) {
+			Map<String, Integer> topVideos = getTopVideos("2vjPBrBU-TM", 10, 3);
+			for (Map.Entry<String, Integer> entry : topVideos.entrySet()) {
 				System.out.println(entry);
 			}
 
@@ -112,11 +57,71 @@ public class SearchVideos {
 		}
 	}
 
-	private static List<Integer> getViewCount(List<String> videoIds,
-			Properties properties) throws IOException {
+	public static Map<String, Integer> getTopVideos(String videoId,
+			int numberOfVideos, int nestingLevel) throws IOException {
+		List<String> videoIDs = getVideoIdWithNestingLevels(
+				getVideosIds(videoId), nestingLevel);
+		return Sorter.getTopNValues(Sorter.compareByViewCount(getMap(videoIDs,
+				getViewCount(videoIDs))), numberOfVideos);
+	}
+
+	private static List<String> getVideoIdWithNestingLevels(
+			List<String> initialList, int nestingLevel) throws IOException {
+		YouTube.Search.List search = youtube.search().list("snippet");
+		String apiKey = authorization();
+		search.setKey(apiKey);
+		int count = 1;
+		List<String> tempVideoIds = new ArrayList<String>();
+		List<String> tempID = new ArrayList<String>();
+		List<String> returnIds = new ArrayList<String>();
+		tempVideoIds.addAll(initialList);
+		returnIds.addAll(initialList);
+		while (count != nestingLevel) {
+			for (String videoId : tempVideoIds) {
+				tempID.addAll(getVideosIds(videoId));
+			}
+			returnIds.addAll(tempID);
+			tempVideoIds.clear();
+			tempVideoIds.addAll(tempID);
+			tempID.clear();
+			count++;
+		}
+		return returnIds;
+	}
+
+	private static List<String> getVideosIds(String videoId) throws IOException {
+		YouTube.Search.List search = youtube.search().list("snippet");
+		String apiKey = authorization();
+		search.setKey(apiKey);
+		search.setType("video");
+		search.setRelatedToVideoId(videoId);
+		search.setFields("items(id/kind,id/videoId)");
+		search.setMaxResults(NUMBER_OF_VIDEOS_RETURNED);
+		SearchListResponse searchResponse = search.execute();
+
+		List<SearchResult> searchResultList = searchResponse.getItems();
+		List<String> videoIds = new ArrayList<String>();
+
+		if (searchResultList != null) {
+			Iterator<SearchResult> iteratorSearchResults = searchResultList
+					.iterator();
+			while (iteratorSearchResults.hasNext()) {
+				SearchResult singleVideo = iteratorSearchResults.next();
+				ResourceId rId = singleVideo.getId();
+				if (rId.getKind().equals("youtube#video")) {
+
+					videoIds.add(rId.getVideoId());
+				}
+			}
+		}
+		return videoIds;
+	}
+
+	private static List<Integer> getViewCount(List<String> videoIds)
+			throws IOException {
 		com.google.api.services.youtube.YouTube.Videos.List search = youtube
 				.videos().list("statistics");
-		String apiKey = properties.getProperty("youtube.apikey");
+		String apiKey = authorization();
 		search.setKey(apiKey);
 		List<Integer> viewCount = new ArrayList<Integer>();
 		for (String vidID : videoIds) {
@@ -131,26 +136,6 @@ public class SearchVideos {
 		return viewCount;
 	}
 
-	private static List<String> getIdVideo(String gueryLine,
-			Properties properties) throws IOException {
-		YouTube.Search.List search = youtube.search().list("snippet");
-		String apiKey = properties.getProperty("youtube.apikey");
-		search.setKey(apiKey);
-		search.setType("video");
-		search.setRelatedToVideoId(gueryLine);
-		search.setFields("items(id/kind,id/videoId)");
-		search.setMaxResults(NUMBER_OF_VIDEOS_RETURNED);
-		SearchListResponse searchResponse = search.execute();
-
-		List<SearchResult> searchResultList = searchResponse.getItems();
-		List<String> videoIds = null;
-
-		if (searchResultList != null) {
-			videoIds = getVideoIds(searchResultList.iterator());
-		}
-		return videoIds;
-	}
-
 	private static Map<String, Integer> getMap(List<String> ls, List<Integer> li) {
 		Map<String, Integer> relatedLinksMap = new HashMap<String, Integer>();
 		Iterator<String> links_iter = ls.iterator();
@@ -161,21 +146,17 @@ public class SearchVideos {
 		return relatedLinksMap;
 	}
 
-	private static List<String> getVideoIds(
-			Iterator<SearchResult> iteratorSearchResults) {
-
-		List<String> linksIds = new ArrayList<String>();
-		while (iteratorSearchResults.hasNext()) {
-
-			SearchResult singleVideo = iteratorSearchResults.next();
-			ResourceId rId = singleVideo.getId();
-
-			if (rId.getKind().equals("youtube#video")) {
-
-				linksIds.add(rId.getVideoId());
-			}
+	private static String authorization() {
+		Properties properties = new Properties();
+		try {InputStream in = Search.class.getResourceAsStream("/"+ PROPERTIES_FILENAME);
+			properties.load(in);
+		} catch (IOException e) {
+			System.err.println("There was an error reading "
+					+ PROPERTIES_FILENAME + ": " + e.getCause() + " : "
+					+ e.getMessage());
+			System.exit(1);
 		}
-		return linksIds;
+		String apiKey = properties.getProperty("youtube.apikey");
+		return apiKey;
 	}
-
 }
