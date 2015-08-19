@@ -71,9 +71,9 @@ public class SearchVideos {
 		String apiKey = authorization();
 		search.setKey(apiKey);
 		int count = 1;
-		List<String> tempVideoIds = new ArrayList<String>();
-		List<String> tempID = new ArrayList<String>();
-		List<String> returnIds = new ArrayList<String>();
+		List<String> tempVideoIds = new ArrayList<>();
+		List<String> tempID = new ArrayList<>();
+		List<String> returnIds = new ArrayList<>();
 		tempVideoIds.addAll(initialList);
 		returnIds.addAll(initialList);
 		while (count != nestingLevel) {
@@ -100,7 +100,7 @@ public class SearchVideos {
 		SearchListResponse searchResponse = search.execute();
 
 		List<SearchResult> searchResultList = searchResponse.getItems();
-		List<String> videoIds = new ArrayList<String>();
+		List<String> videoIds = new ArrayList<>();
 
 		if (searchResultList != null) {
 			Iterator<SearchResult> iteratorSearchResults = searchResultList
@@ -123,7 +123,7 @@ public class SearchVideos {
 				.videos().list("statistics");
 		String apiKey = authorization();
 		search.setKey(apiKey);
-		List<Integer> viewCount = new ArrayList<Integer>();
+		List<Integer> viewCount = new ArrayList<>();
 		for (String vidID : videoIds) {
 			search.setId(vidID);
 			try {
@@ -137,7 +137,7 @@ public class SearchVideos {
 	}
 
 	private static Map<String, Integer> getMap(List<String> ls, List<Integer> li) {
-		Map<String, Integer> relatedLinksMap = new HashMap<String, Integer>();
+		Map<String, Integer> relatedLinksMap = new HashMap<>();
 		Iterator<String> links_iter = ls.iterator();
 		Iterator<Integer> rating_iter = li.iterator();
 		while (links_iter.hasNext() && rating_iter.hasNext()) {
